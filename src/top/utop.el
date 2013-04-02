@@ -316,9 +316,9 @@ it is started."
          (t
           ": unknown"))))
 
-(defun utop-send-data (cmd)
+(defun utop-send-data1 (cmd phrase)
   "Send current input to utop"
-  (let ((lines (split-string (buffer-substring-no-properties utop-prompt-max (point-max)) "\n")))
+  (let ((lines (split-string phrase "\n")))
     ;; Send all lines to utop
     (utop-send-string cmd)
     (while lines
@@ -327,6 +327,20 @@ it is started."
       ;; Remove it and continue
       (setq lines (cdr lines)))
     (utop-send-string "end:\n")))
+
+(defun utop-send-data (cmd)
+  "Send current input to utop"
+  (let ((input (buffer-substring-no-properties utop-prompt-max (point-max))))
+    (if (string-match "^input:" cmd)
+        (let ((phrases (split-string input ";;"))
+              result)
+          (if (butlast phrases)
+              (progn
+                (dolist (phrase (butlast phrases))
+                  (setq result (utop-send-data1 cmd (concat phrase ";;"))))
+                result)
+            (utop-send-data1 cmd input)))
+      (utop-send-data1 cmd input))))
 
 (defun utop-last-type ()
   "Extract last inferred type from the uTop toplevel"
