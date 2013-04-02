@@ -346,11 +346,27 @@ it is started."
         (phrase (cdr input)))
     (utop-send-data1 cmd phrase)))
 
+(defun utop-filter-comments (input)
+  (let ((result "")
+        (pos 0)
+        (depth 0)
+        start)
+    (while (setq start (string-match "(\\*\\|\\*)" input pos))
+      (when (zerop depth)
+        (setq result (concat result (subseq input pos start))))
+      (if (eql (string-match "(\\*" input start) start)
+          (setq depth (1+ depth))
+        (setq depth (1- depth)))
+      (setq pos (+ start 2)))
+    (when (zerop depth)
+      (setq result (concat result (subseq input pos))))
+    result))
+
 (defun utop-send-data (cmd)
   "Send current input to utop"
   (let ((input (buffer-substring-no-properties utop-prompt-max (point-max))))
     (if (string-match "^input:" cmd)
-        (let ((phrases (split-string input ";;")))
+        (let ((phrases (split-string (utop-filter-comments input) ";;")))
           (if (butlast phrases)
               (progn
                 (setq utop-input-prompt-max utop-prompt-max)
