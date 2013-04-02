@@ -328,17 +328,34 @@ it is started."
       (setq lines (cdr lines)))
     (utop-send-string "end:\n")))
 
+(defvar utop-input-queue (list))
+
+(defun utop-process-queue ()
+  (when (and (eq utop-state 'edit) utop-input-queue)
+    (let ((input (car utop-input-queue)))
+      (setq utop-input-queue (cdr utop-input-queue))
+      (utop-process-input input))))
+
+(defun utop-process-input (input)
+  ;;(eq utop-state 'edit)
+  (utop-set-state 'wait)
+  (let ((cmd    (car input))
+        (phrase (cdr input)))
+    (utop-send-data1 cmd phrase)))
+
 (defun utop-send-data (cmd)
   "Send current input to utop"
   (let ((input (buffer-substring-no-properties utop-prompt-max (point-max))))
     (if (string-match "^input:" cmd)
-        (let ((phrases (split-string input ";;"))
-              result)
+        (let ((phrases (split-string input ";;")))
           (if (butlast phrases)
               (progn
-                (dolist (phrase (butlast phrases))
-                  (setq result (utop-send-data1 cmd (concat phrase ";;"))))
-                result)
+                (setq utop-input-queue
+                      (append utop-input-queue
+                              (mapcar (lambda (x) (cons cmd (concat x ";;")))
+                                      (butlast phrases))))
+                (utop-set-state 'edit)
+                (utop-process-queue))
             (utop-send-data1 cmd input)))
       (utop-send-data1 cmd input))))
 
@@ -641,7 +658,10 @@ it is started."
        ;; When the list contains only one element, then this is either
        ;; the end of commands, either an unterminated one, so we save
        ;; it for later
-       (setq utop-output (car lines))))))
+       (setq utop-output (car lines))))
+    (utop-process-queue)))
+
+;;(setq utop-input-queue nil)
 
 ;; +-----------------------------------------------------------------+
 ;; | Sending data to the utop sub-process                            |
