@@ -151,9 +151,6 @@ This hook is only run if exiting actually kills the buffer."
 (defvar utop-prompt-max 0
   "The point at the end of the current prompt.")
 
-(defvar utop-input-prompt-max 0
-  "The point at the end of the last input prompt.")
-
 (defvar utop-output ""
   "The output of the utop sub-process not yet processed.")
 
@@ -319,9 +316,9 @@ it is started."
          (t
           ": unknown"))))
 
-(defun utop-send-data1 (cmd phrase)
+(defun utop-send-data (cmd)
   "Send current input to utop"
-  (let ((lines (split-string phrase "\n")))
+  (let ((lines (split-string (buffer-substring-no-properties utop-prompt-max (point-max)) "\n")))
     ;; Send all lines to utop
     (utop-send-string cmd)
     (while lines
@@ -330,54 +327,6 @@ it is started."
       ;; Remove it and continue
       (setq lines (cdr lines)))
     (utop-send-string "end:\n")))
-
-(defvar utop-input-queue (list))
-
-(defun utop-process-queue ()
-  (when (and (eq utop-state 'edit) utop-input-queue)
-    (let ((input (car utop-input-queue)))
-      (setq utop-input-queue (cdr utop-input-queue))
-      (utop-process-input input))))
-
-(defun utop-process-input (input)
-  ;;(eq utop-state 'edit)
-  (utop-set-state 'wait)
-  (let ((cmd    (car input))
-        (phrase (cdr input)))
-    (utop-send-data1 cmd phrase)))
-
-(defun utop-filter-comments (input)
-  (let ((result "")
-        (pos 0)
-        (depth 0)
-        start)
-    (while (setq start (string-match "(\\*\\|\\*)" input pos))
-      (when (zerop depth)
-        (setq result (concat result (subseq input pos start))))
-      (if (eql (string-match "(\\*" input start) start)
-          (setq depth (1+ depth))
-        (setq depth (1- depth)))
-      (setq pos (+ start 2)))
-    (when (zerop depth)
-      (setq result (concat result (subseq input pos))))
-    result))
-
-(defun utop-send-data (cmd)
-  "Send current input to utop"
-  (let ((input (buffer-substring-no-properties utop-prompt-max (point-max))))
-    (if (string-match "^input:" cmd)
-        (let ((phrases (split-string (utop-filter-comments input) ";;")))
-          (if (butlast phrases)
-              (progn
-                (setq utop-input-prompt-max utop-prompt-max)
-                (setq utop-input-queue
-                      (append utop-input-queue
-                              (mapcar (lambda (x) (cons cmd (concat x ";;")))
-                                      (butlast phrases))))
-                (utop-set-state 'edit)
-                (utop-process-queue))
-            (utop-send-data1 cmd input)))
-      (utop-send-data1 cmd input))))
 
 (defun utop-last-type ()
   "Extract last inferred type from the uTop toplevel"
@@ -680,10 +629,7 @@ it is started."
        ;; When the list contains only one element, then this is either
        ;; the end of commands, either an unterminated one, so we save
        ;; it for later
-       (setq utop-output (car lines))))
-    (utop-process-queue)))
-
-;;(setq utop-input-queue nil)
+       (setq utop-output (car lines))))))
 
 ;; +-----------------------------------------------------------------+
 ;; | Sending data to the utop sub-process                            |
@@ -1166,7 +1112,6 @@ defaults to 0."
   ;; Reset variables
   (setq utop-prompt-min (point-max))
   (setq utop-prompt-max (point-max))
-  (setq utop-input-prompt-max (point-max))
   (setq utop-output "")
   (setq utop-command-number 0)
   (setq utop-completion nil)
@@ -1202,7 +1147,6 @@ defaults to 0."
   (make-local-variable 'utop-process)
   (make-local-variable 'utop-prompt-min)
   (make-local-variable 'utop-prompt-max)
-  (make-local-variable 'utop-input-prompt-max)
   (make-local-variable 'utop-last-prompt)
   (make-local-variable 'utop-output)
   (make-local-variable 'utop-command-number)
